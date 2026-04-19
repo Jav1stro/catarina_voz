@@ -1,17 +1,10 @@
-// sketch.js — Orquestador: espina → nodos → trazos
+// sketch.js — Orquestador: árbol → nodos → trazos
 
-const ANCHO = 540;
-const ALTO  = 810;
+const ANCHO = CFG.ANCHO;
+const ALTO  = CFG.ALTO;
+const CAPAS = CFG.CAPAS;
 
 let PALETA;
-
-const CAPAS = [
-  { idx: [0, 1],    gMult: 3.0, alfaMin: 155, alfaMax: 220 },
-  { idx: [0, 1, 2], gMult: 1.6, alfaMin: 125, alfaMax: 195 },
-  { idx: [2, 3],    gMult: 1.0, alfaMin:  95, alfaMax: 170 },
-  { idx: [3, 4],    gMult: 0.4, alfaMin:  55, alfaMax: 140 },
-];
-
 let espina;
 let grafo;
 let animFrame  = 0;
@@ -22,18 +15,14 @@ function setup() {
   let cnv = createCanvas(ANCHO, ALTO);
   cnv.style('box-shadow', '0 0 40px rgba(0,0,0,0.7)');
   colorMode(RGB, 255);
-  frameRate(30);
+  frameRate(CFG.FPS);
 
-  PALETA = [
-    color( 30,  94,  74),  // 0 — teal oscuro
-    color(110, 185, 152),  // 1 — verde claro
-    color(224, 128,  64),  // 2 — naranja
-    color(196, 120, 136),  // 3 — rosa
-    color(240, 232, 216),  // 4 — blanco cálido
-  ];
+  PALETA       = CFG.COLORES.map(c => color(c[0], c[1], c[2]));
+  FONDO_INICIO = color(...CFG.FONDO_INICIO);
+  FONDO_FINAL  = color(...CFG.FONDO_FINAL);
 
-  FONDO_INICIO = color(238, 232, 218); // blanco cálido
-  FONDO_FINAL  = color( 20,  38,  32); // teal oscuro
+  // Fondo exterior inicial
+  document.body.style.background = `rgb(${CFG.FONDO_INICIO.join(',')})`;
 
   _generarComposicion();
 }
@@ -43,12 +32,13 @@ function draw() {
 
   animFrame++;
 
-  // Fondo sincronizado con el progreso del grafo
   let p    = grafo.progresoPromedio();
   let ease = p * p * (3 - 2 * p);
-  background(lerpColor(FONDO_INICIO, FONDO_FINAL, ease));
+  let bgColor = lerpColor(FONDO_INICIO, FONDO_FINAL, ease);
+  background(bgColor);
+  document.body.style.background =
+    `rgb(${floor(red(bgColor))},${floor(green(bgColor))},${floor(blue(bgColor))})`;
 
-  // Orden de dibujado: espina debajo, trazos encima
   espina.actualizar(animFrame);
   grafo.actualizar(animFrame);
 
@@ -70,7 +60,7 @@ function _generarComposicion() {
   loop();
 }
 
-// ESPACIO → nueva composición desde blanco
+// ESPACIO → nueva composición
 function keyPressed() {
   if (key === ' ') _generarComposicion();
 }
