@@ -88,22 +88,22 @@ const CFG = {
     NODOS_ARBOL_MAX:  32,
     NODOS_EXTRA_MIN:  4,   // nodos flotantes — emergen tras completarse el árbol
     NODOS_EXTRA_MAX:  8,
-    LIBRES_MIN:       5,   // trazos que emite cada nodo (mínimo)
-    LIBRES_MAX:       9,   // trazos que emite cada nodo (máximo)
+    LIBRES_MIN:       1,   // trazos que emite cada nodo (mínimo)
+    LIBRES_MAX:       2,   // trazos que emite cada nodo (máximo)
     NODO_JITTER_MIN:  2,   // frames de jitter al emerger el nodo
     NODO_JITTER_MAX:  10,
   },
 
   // ── Trazos ────────────────────────────────────────────────────
   TRAZO: {
-    GROSOR_MIN:           1.2,
-    GROSOR_MAX:           4.0,  // trazos libres siempre más finos que la espina
+    GROSOR_MIN:           6.0,
+    GROSOR_MAX:           18.0, // más anchos para mayor presencia pictórica
     DUR_MIN:              20,   // frames mínimos — piso para trazos muy cortos
     MUESTRAS:             110,
     ALFA_MIN:             130,
     ALFA_MAX:             225,
-    LARGO_MIN:            0.25, // × height — recorrido geométrico mínimo
-    LARGO_MAX:            0.90, // × height — recorrido geométrico máximo
+    LARGO_MIN:            0.35, // × height — recorrido geométrico mínimo
+    LARGO_MAX:            1.10, // × height — recorrido geométrico máximo
     DIR_SPREAD:           1.4,  // rad — apertura angular máx. desde la tangente de la rama
     ONDA_MIN:             1.5,  // ciclos de oscilación de grosor en zonas poco densas
     ONDA_MAX:             4.5,  // ciclos en zonas densas
@@ -117,18 +117,18 @@ const CFG = {
     INTENTOS_NODO:         300, // intentos máx. para colocar cada nodo flotante
     GRID_COLS:               10, // columnas de la grilla de detección de vacíos
     GRID_ROWS:               16, // filas
-    TRAZOS_POR_ZONA_VACIA:   25, // trazos extra que se disparan hacia cada zona vacía
-    SPREAD_ZONA:            1.0,// rad — variación angular al apuntar a zona vacía
+    TRAZOS_POR_ZONA_VACIA:   3,  // trazos extra que se disparan hacia cada zona vacía
+    SPREAD_ZONA:            1.0, // rad — variación angular al apuntar a zona vacía
   },
 
   // ── Post-proceso de densidad ──────────────────────────────────
   DENSIDAD: {
     RADIO:         145,  // px — radio de influencia para medir densidad local
-    FACTOR_SPARSE: 2.2,  // grosor en zonas vacías
-    FACTOR_DENSE:  0.55, // grosor en zonas densas
+    FACTOR_SPARSE: 2.5,  // grosor en zonas vacías
+    FACTOR_DENSE:  0.65, // grosor en zonas densas
     UMBRAL:        0.45, // densidad máxima del mapeo
-    ACCENT_UMBRAL: 2.5,  // trazos más finos que esto no se escalan
-    GROSOR_MAX:    10,   // tope de grosor para libres (espina siempre supera esto)
+    ACCENT_UMBRAL: 3.5,  // trazos más finos que esto no se escalan
+    GROSOR_MAX:    35,   // tope de grosor para libres
   },
 
   // ── Nodos ─────────────────────────────────────────────────────
