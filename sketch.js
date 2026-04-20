@@ -21,6 +21,14 @@ function setup() {
   FONDO_INICIO = color(...CFG.FONDO_INICIO);
   FONDO_FINAL  = color(...CFG.FONDO_FINAL);
 
+  // Normaliza CAPAS: filtra índices que excedan la paleta actual
+  // y rellena con índices válidos si una capa queda vacía.
+  const todosIdx = CFG.COLORES.map((_, i) => i);
+  CFG.CAPAS.forEach(c => {
+    c.idx = c.idx.filter(i => i < PALETA.length);
+    if (c.idx.length === 0) c.idx = [...todosIdx];
+  });
+
   // Fondo exterior inicial
   document.body.style.background = `rgb(${CFG.FONDO_INICIO.join(',')})`;
 

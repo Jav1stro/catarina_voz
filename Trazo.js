@@ -4,7 +4,7 @@
 // fase y ondas son asignados por Red tras el cálculo de densidad (pastiche).
 
 class Trazo {
-  constructor(nodoOrigen, colorTrazo, grosorMult = 1, angDir = null) {
+  constructor(nodoOrigen, colorTrazo, grosorMult = 1, angDir = null, largoForzado = null) {
     this.color      = colorTrazo;
     this.grosorBase = random(CFG.TRAZO.GROSOR_MIN, CFG.TRAZO.GROSOR_MAX) * grosorMult;
 
@@ -12,7 +12,9 @@ class Trazo {
     this.nOffset = random(10000);
     this.nFreq   = random(2, 6);
 
-    this.largo        = 0; // asignado en _generarPuntos
+    this.largo        = 0;
+    this._largoForzado = largoForzado; // null = aleatorio, número = destino compartido del grupo
+    this.colisionado  = false;
     this.pts          = this._generarPuntos(nodoOrigen.pos, angDir);
 
     // Duración proporcional al largo × factor de la espina → misma velocidad visual
@@ -34,16 +36,23 @@ class Trazo {
   // angDir: ángulo base (tangente de la rama). null → completamente libre.
   _generarPuntos(posIni, angDir) {
     let pts = [];
-    this.largo = random(height * CFG.TRAZO.LARGO_MIN, height * CFG.TRAZO.LARGO_MAX);
+    this.largo = (this._largoForzado !== null)
+      ? this._largoForzado
+      : random(height * CFG.TRAZO.LARGO_MIN, height * CFG.TRAZO.LARGO_MAX);
     let largo  = this.largo;
 
     let numCtrl = floor(random(5, 10));
     let paso    = largo / numCtrl;
 
-    // Ángulo inicial: si hay dirección base, se abre un abanico desde ella
-    let angInicial = (angDir !== null)
-      ? angDir + random(-CFG.TRAZO.DIR_SPREAD, CFG.TRAZO.DIR_SPREAD)
-      : random(TWO_PI);
+    // Ángulo de referencia: tangente de la rama (nodos árbol) o vertical arriba (flotantes).
+    // Si el ángulo apunta hacia abajo (sin > 0 en p5 donde Y crece hacia abajo),
+    // se refleja al hemisferio ascendente para que ningún trazo vaya contra la espina.
+    let angRef = (angDir !== null) ? angDir : -HALF_PI;
+    if (sin(angRef) > 0) angRef = -angRef;
+
+    let angInicial = angRef + random(-CFG.TRAZO.DIR_SPREAD, CFG.TRAZO.DIR_SPREAD);
+    // Segunda guarda: el spread puede cruzar el ecuador horizontal — se refleja de nuevo
+    if (sin(angInicial) > 0) angInicial = -angInicial;
 
     let x = posIni.x + random(-6, 6);
     let y = posIni.y + random(-6, 6);
@@ -52,7 +61,7 @@ class Trazo {
     for (let i = 1; i <= numCtrl; i++) {
       // Evolución orgánica del ángulo con noise — curvatura suave, no zigzag
       let nVal = noise(i * 0.42 + this.nDesvio);
-      let ang  = angInicial + map(nVal, 0, 1, -PI * 0.45, PI * 0.45);
+      let ang  = angInicial + map(nVal, 0, 1, -PI * CFG.TRAZO.CURV, PI * CFG.TRAZO.CURV);
 
       x += cos(ang) * paso * random(0.75, 1.25);
       y += sin(ang) * paso * random(0.75, 1.25);
@@ -84,6 +93,7 @@ class Trazo {
   }
 
   actualizar(frame) {
+    if (this.colisionado) return;
     if (frame < this.retraso) return;
     this.progreso = min((frame - this.retraso) / this.duracion, 1);
   }
@@ -106,8 +116,10 @@ class Trazo {
       let presion = noise(t * this.nFreq + this.nOffset);
       let grosor  = max(0.2, this.grosorBase * envolv * onda * (0.55 + 0.45 * presion));
 
+      // Desvanecimiento alpha en el último 35% del trazo — simula pincel que se agota
+      let alfaFinal = t > 0.65 ? this.alfa * map(t, 0.65, 1.0, 1.0, 0.1) : this.alfa;
       strokeWeight(grosor);
-      stroke(red(this.color), green(this.color), blue(this.color), this.alfa);
+      stroke(red(this.color), green(this.color), blue(this.color), alfaFinal);
       noFill();
       if (prev) line(prev.x, prev.y, pt.x, pt.y);
       prev = pt;

@@ -5,24 +5,28 @@
 
 class Red {
   constructor() {
-    this.nodos        = [];
-    this.libres       = [];
-    this._tiempoEmerg = [];
-    this._ramaDeNodo  = [];
-    this._tEnRama     = [];
-    this._angNodo     = []; // ángulo tangente de la rama en el punto del nodo
-    this._intensidad  = 1.0;
+    this.nodos               = [];
+    this.libres              = [];
+    this._tiempoEmerg        = [];
+    this._ramaDeNodo         = [];
+    this._tEnRama            = [];
+    this._angNodo            = [];
+    this._muestraRegistrada  = []; // última muestra registrada en la grilla por cada libre
+    this._intensidad         = 1.0;
+    this.grid                = new SpatialGrid(CFG.RED.GRID_CELL_SIZE);
   }
 
   // ── Generación ─────────────────────────────────────────────────
 
   generar(espina) {
-    this.nodos        = [];
-    this.libres       = [];
-    this._tiempoEmerg = [];
-    this._ramaDeNodo  = [];
-    this._tEnRama     = [];
-    this._angNodo     = [];
+    this.nodos               = [];
+    this.libres              = [];
+    this._tiempoEmerg        = [];
+    this._ramaDeNodo         = [];
+    this._tEnRama            = [];
+    this._angNodo            = [];
+    this._muestraRegistrada  = [];
+    this.grid.limpiar();
 
     // Nodos sobre las ramas del árbol
     let numArbol   = floor(random(CFG.RED.NODOS_ARBOL_MIN, CFG.RED.NODOS_ARBOL_MAX));
@@ -70,6 +74,8 @@ class Red {
   actualizar(frame) {
     for (let n of this.nodos)  n.actualizar();
     for (let l of this.libres) l.trazo.actualizar(frame);
+    this._registrarEnGrilla();
+    this._detectarColisiones();
   }
 
   dibujar() {
@@ -80,7 +86,7 @@ class Red {
 
   terminado() {
     if (this.libres.length === 0) return false;
-    return this.libres.every(l => l.trazo.progreso >= 1);
+    return this.libres.every(l => l.trazo.progreso >= 1 || l.trazo.colisionado);
   }
 
   progresoPromedio() {
@@ -173,12 +179,18 @@ class Red {
 
   _generarLibresNodo(i) {
     let num = floor(random(CFG.RED.LIBRES_MIN, CFG.RED.LIBRES_MAX));
-    let ang = this._angNodo[i]; // null para nodos flotantes
+    let ang = this._angNodo[i];
+
+    // Destino compartido del grupo: todos los trazos del nodo apuntan a la misma distancia base.
+    // El líder (t=0) llega completo; los demás se desvanecen antes según FRACCION_MIN.
+    let targetLargo = random(height * CFG.TRAZO.LARGO_MIN, height * CFG.TRAZO.LARGO_MAX);
+
     for (let t = 0; t < num; t++) {
-      let capa = CAPAS[floor(random(CAPAS.length))];
-      let col  = PALETA[capa.idx[floor(random(capa.idx.length))]];
-      let tr   = new Trazo(this.nodos[i], col, capa.gMult, ang);
-      tr.alfa  = random(capa.alfaMin, capa.alfaMax);
+      let capa    = CAPAS[floor(random(CAPAS.length))];
+      let col     = PALETA[capa.idx[floor(random(capa.idx.length))]];
+      let fraccion = (t === 0) ? 1.0 : random(CFG.RED.FRACCION_MIN, 0.92);
+      let tr      = new Trazo(this.nodos[i], col, capa.gMult, ang, targetLargo * fraccion);
+      tr.alfa     = random(capa.alfaMin, capa.alfaMax) * (0.5 + 0.5 * fraccion);
       this.libres.push({ nodoIdx: i, trazo: tr });
     }
   }
@@ -215,6 +227,51 @@ class Red {
     }
   }
 
+  // Registra en la grilla los puntos nuevos de cada trazo (solo los aún no registrados).
+  // Se llama cada frame para mantener la grilla actualizada sin re-registrar todo.
+  _registrarEnGrilla() {
+    for (let i = 0; i < this.libres.length; i++) {
+      let l = this.libres[i];
+      if (l.trazo.progreso <= 0) continue;
+
+      let limite = floor(l.trazo.progreso * l.trazo.muestras);
+      let desde  = this._muestraRegistrada[i] ?? 0;
+
+      for (let k = desde; k <= limite; k += 2) {
+        let pt = l.trazo._evaluar(k / l.trazo.muestras);
+        this.grid.registrar(pt.x, pt.y, l.nodoIdx, l.trazo);
+      }
+
+      this._muestraRegistrada[i] = limite + 1;
+    }
+  }
+
+  // Colisión via grilla: consulta O(1) por celda en lugar de O(n²m).
+  // La punta del trazo activo busca entradas de otros nodos en su radio.
+  _detectarColisiones() {
+    let radio = CFG.RED.COLISION_RADIO;
+
+    for (let i = 0; i < this.libres.length; i++) {
+      let li = this.libres[i];
+      let ti = li.trazo;
+      if (ti.colisionado || ti.progreso < 0.15 || ti.progreso >= 1) continue;
+
+      let punta   = ti._evaluar(ti.progreso);
+      let vecinos = this.grid.consultar(punta.x, punta.y, radio, li.nodoIdx);
+
+      if (vecinos.length > 0) {
+        // Verificación de distancia exacta contra los puntos devueltos por la grilla
+        for (let v of vecinos) {
+          if (punta.dist(createVector(v.x, v.y)) < radio) {
+            ti.colisionado    = true;
+            ti.puntoColision  = punta.copy(); // guardado para el Paso 3 (efecto visual)
+            break;
+          }
+        }
+      }
+    }
+  }
+
   // Asigna fase espacial y ondas a cada trazo según densidad local.
   // Trazos cercanos comparten fase → sus grosores se expanden y contraen en sintonía.
   _calcularOscilaciones() {
@@ -245,6 +302,18 @@ class Red {
           this.libres[i].trazo.grosorBase * factor, 1, D.GROSOR_MAX
         );
       }
+
+      // Alpha inversamente proporcional al grosor final:
+      // trazos gruesos → más transparentes → dejan ver el pastiche debajo
+      let alfaFactor = map(
+        this.libres[i].trazo.grosorBase,
+        1, D.GROSOR_MAX,
+        CFG.TRAZO.ALFA_GROSOR_FACTOR_MAX, CFG.TRAZO.ALFA_GROSOR_FACTOR_MIN,
+        true
+      );
+      this.libres[i].trazo.alfa = constrain(
+        this.libres[i].trazo.alfa * alfaFactor, 15, 255
+      );
     }
   }
 }
