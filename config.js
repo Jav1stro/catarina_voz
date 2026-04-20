@@ -31,14 +31,14 @@ const CFG = {
     { idx: [0, 6, 7],    gMult: 3.0, alfaMin: 155, alfaMax: 220 }, // oscuros/gruesos
     { idx: [0, 1, 5],    gMult: 1.6, alfaMin: 125, alfaMax: 195 }, // vegetales/ocres
     { idx: [2, 3, 7],    gMult: 1.0, alfaMin:  95, alfaMax: 170 }, // cálidos
-    { idx: [3, 8, 4],    gMult: 0.6, alfaMin:  70, alfaMax: 155 }, // lilas/claros
+    // { idx: [3, 8, 4],    gMult: 0.6, alfaMin:  70, alfaMax: 155 }, // lilas/claros
     { idx: [1, 5, 6],    gMult: 0.4, alfaMin:  45, alfaMax: 130 }, // finos/acento
   ],
 
   // ── Árbol / Espina ────────────────────────────────────────────
   ARBOL: {
-    DURACION_FACTOR: 0.26,       // px/frame inverso — mayor = espina más lenta
-    PESO_NIVEL:      [4.0, 1.0, 0.4], // peso de nodos por nivel: tronco, rama, sub-rama
+    DURACION_FACTOR: 0.1,       // px/frame inverso — mayor = espina más lenta
+    PESO_NIVEL:      [5.0, 1.0, 0.4], // peso de nodos por nivel: tronco, rama, sub-rama
   },
 
   TRONCO: {
@@ -51,8 +51,8 @@ const CFG = {
   },
 
   RAMAS: {
-    NUM_MIN:     5,
-    NUM_MAX:     6,    // random(3,6) → 3, 4 o 5
+    NUM_MIN:     1,
+    NUM_MAX:     5,    // random(3,6) → 3, 4 o 5
     T_MIN:       0.20, // posición mínima sobre el tronco
     T_MAX:       0.90,
     DIV_MIN:     0.55, // rad — divergencia mínima desde la tangente del tronco
@@ -66,11 +66,11 @@ const CFG = {
   },
 
   SUB_RAMAS: {
-    PROB:        0.65, // probabilidad de generar sub-ramas en cada rama
+    PROB:        0.05, // probabilidad de generar sub-ramas en cada rama
     NUM_MIN:     1,
     NUM_MAX:     3,
-    T_MIN:       0.30, // posición mínima sobre la rama madre
-    T_MAX:       0.85,
+    T_MIN:       0.05, // posición mínima sobre la rama madre
+    T_MAX:       0.55,
     DIV_MIN:     0.48, // rad
     DIV_MAX:     1.20,
     LARGO_MIN:   0.25, // × ramaLargo
@@ -84,12 +84,12 @@ const CFG = {
   // ── Red (nodos y cantidad de trazos) ─────────────────────────
   // La cantidad total de trazos ≈ (NODOS_ARBOL + NODOS_EXTRA) × LIBRES_POR_NODO
   RED: {
-    NODOS_ARBOL_MIN:  22,  // puntos de origen sobre el árbol (más = más cobertura)
-    NODOS_ARBOL_MAX:  32,
+    NODOS_ARBOL_MIN:  10,  // puntos de origen sobre el árbol (más = más cobertura)
+    NODOS_ARBOL_MAX:  16,
     NODOS_EXTRA_MIN:  4,   // nodos flotantes — emergen tras completarse el árbol
     NODOS_EXTRA_MAX:  8,
-    LIBRES_MIN:       5,   // trazos que emite cada nodo (mínimo)
-    LIBRES_MAX:       9,   // trazos que emite cada nodo (máximo)
+    LIBRES_MIN:       2,   // trazos que emite cada nodo (mínimo)
+    LIBRES_MAX:       4,   // trazos que emite cada nodo (máximo)
     NODO_JITTER_MIN:  2,   // frames de jitter al emerger el nodo
     NODO_JITTER_MAX:  10,
   },
@@ -104,7 +104,7 @@ const CFG = {
     ALFA_MAX:             225,
     LARGO_MIN:            0.25, // × height — recorrido geométrico mínimo
     LARGO_MAX:            0.90, // × height — recorrido geométrico máximo
-    DIR_SPREAD:           1.4,  // rad — apertura angular máx. desde la tangente de la rama
+    DIR_SPREAD:           0.8,  // rad — apertura angular máx. desde la tangente de la rama
     ONDA_MIN:             1.5,  // ciclos de oscilación de grosor en zonas poco densas
     ONDA_MAX:             4.5,  // ciclos en zonas densas
   },
@@ -115,10 +115,10 @@ const CFG = {
   PASTICHE: {
     RADIO_NODO:            130, // px — radio mínimo entre nodos flotantes
     INTENTOS_NODO:         300, // intentos máx. para colocar cada nodo flotante
-    GRID_COLS:               10, // columnas de la grilla de detección de vacíos
-    GRID_ROWS:               16, // filas
-    TRAZOS_POR_ZONA_VACIA:   25, // trazos extra que se disparan hacia cada zona vacía
-    SPREAD_ZONA:            1.0,// rad — variación angular al apuntar a zona vacía
+    GRID_COLS:               7, // columnas de la grilla de detección de vacíos
+    GRID_ROWS:               11, // filas
+    TRAZOS_POR_ZONA_VACIA:   4, // trazos extra que se disparan hacia cada zona vacía
+    SPREAD_ZONA:            0.45,// rad — variación angular al apuntar a zona vacía
   },
 
   // ── Post-proceso de densidad ──────────────────────────────────
@@ -135,7 +135,7 @@ const CFG = {
   NODO: {
     RADIO_MIN: 4,
     RADIO_MAX: 11,
-    DECAY:     0.88, // decay del pulso por frame
+    DECAY:     1, // decay del pulso por frame
   },
 
 };

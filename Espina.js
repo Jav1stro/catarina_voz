@@ -7,8 +7,8 @@ class Rama {
     this.largo      = largo;
     this.grosorBase = grosorBase;
     this.nivel      = nivel;     // 0 = tronco, 1 = rama, 2 = sub-rama
-    this.nOffset    = random(10000);
-    this.nOffsetG   = random(10000);
+    this.nOffset    = random(1000);
+    this.nOffsetG   = random(1000);
     this.pts        = [];
     this.progreso   = 0;
     this.retraso    = 0;
