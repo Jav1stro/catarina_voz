@@ -1,74 +1,147 @@
-// sketch.js — Orquestador: árbol → nodos → trazos
+// sketch.js — Hito 2: Sistema de Trazos Base
 
-const ANCHO = CFG.ANCHO;
-const ALTO  = CFG.ALTO;
-const CAPAS = CFG.CAPAS;
+let pincelesBase    = [];
+let PINCELES_TINTADOS;
+let grid;
+let espinaManager;
+let fondoAmbiente;
+let trazos          = [];
 
-let PALETA;
-let espina;
-let grafo;
-let animFrame  = 0;
-let FONDO_INICIO;
-let FONDO_FINAL;
+// ─── PRELOAD ──────────────────────────────────────────────────────────────────
+function preload() {
+  for (const ruta of CONFIG.PINCELES.RUTAS) {
+    pincelesBase.push(loadImage(ruta));
+  }
+}
 
+// ─── SETUP ────────────────────────────────────────────────────────────────────
 function setup() {
-  let cnv = createCanvas(ANCHO, ALTO);
-  cnv.style('box-shadow', '0 0 40px rgba(0,0,0,0.7)');
+  createCanvas(CONFIG.CANVAS.ANCHO, CONFIG.CANVAS.ALTO);
   colorMode(RGB, 255);
-  frameRate(CFG.FPS);
+  imageMode(CENTER);
+  frameRate(60);
 
-  PALETA       = CFG.COLORES.map(c => color(c[0], c[1], c[2]));
-  FONDO_INICIO = color(...CFG.FONDO_INICIO);
-  FONDO_FINAL  = color(...CFG.FONDO_FINAL);
+  PINCELES_TINTADOS = preRenderizarPinceles();
+  grid          = new PasticheGrid();
+  espinaManager = new EspinaManager();
+  fondoAmbiente = new FondoAmbiente();
 
-  // Normaliza CAPAS: filtra índices que excedan la paleta actual
-  // y rellena con índices válidos si una capa queda vacía.
-  const todosIdx = CFG.COLORES.map((_, i) => i);
-  CFG.CAPAS.forEach(c => {
-    c.idx = c.idx.filter(i => i < PALETA.length);
-    if (c.idx.length === 0) c.idx = [...todosIdx];
-  });
+  document.body.style.background = CONFIG.PAGINA.BODY_BG;
+  document.querySelector('canvas').style.boxShadow = CONFIG.PAGINA.CANVAS_SHADOW;
 
-  // Fondo exterior inicial
-  document.body.style.background = `rgb(${CFG.FONDO_INICIO.join(',')})`;
-
-  _generarComposicion();
+  _limpiarLienzo();
+  _poblarTrazos();
 }
 
+// ─── DRAW ─────────────────────────────────────────────────────────────────────
 function draw() {
-  if (espina.terminado() && grafo.terminado()) return;
+  // Sin background() por frame: la pintura se acumula
+  fondoAmbiente.update();
 
-  animFrame++;
+  for (let i = trazos.length - 1; i >= 0; i--) {
+    trazos[i].update();
+    if (trazos[i].muerto) {
+      trazos.splice(i, 1);
+      trazos.push(_nuevoTrazo()); // reemplaza inmediatamente
+    }
+  }
 
-  let p    = grafo.progresoPromedio();
-  let ease = p * p * (3 - 2 * p);
-  let bgColor = lerpColor(FONDO_INICIO, FONDO_FINAL, ease);
-  background(bgColor);
-  document.body.style.background =
-    `rgb(${floor(red(bgColor))},${floor(green(bgColor))},${floor(blue(bgColor))})`;
-
-  espina.actualizar(animFrame);
-  grafo.actualizar(animFrame);
-
-  espina.dibujar();
-  grafo.dibujar();
+  if (CONFIG.DEBUG.ACTIVO) {
+    if (CONFIG.DEBUG.MOSTRAR_ESPINAS) espinaManager.debug();
+    if (CONFIG.DEBUG.MOSTRAR_GRILLA)  grid.debug();
+    _debugHUD();
+  }
 }
 
-function _generarComposicion() {
-  let semilla = floor(Math.random() * 99999);
-  randomSeed(semilla);
-  noiseSeed(semilla);
-
-  animFrame = 0;
-
-  espina = new Espina();
-  grafo  = new Red();
-  grafo.generar(espina);
-
-  loop();
+// ─── HELPERS INTERNOS ─────────────────────────────────────────────────────────
+function _limpiarLienzo() {
+  const bg = CONFIG.PALETA[3]; // OSCURO_PROFUNDO
+  background(bg.r, bg.g, bg.b);
+  grid.reset();
+  if (fondoAmbiente) fondoAmbiente.reset();
 }
 
-// ESPACIO → nueva composición
+function _poblarTrazos() {
+  trazos = [];
+  for (let i = 0; i < CONFIG.MOVIMIENTO.TRAZOS_MAX; i++) {
+    trazos.push(_nuevoTrazo());
+  }
+}
+
+// Nace en un radio alrededor del origen con un color libre al azar
+function _nuevoTrazo() {
+  const ox  = CONFIG.ESPINAS.ORIGEN_X * width;
+  const oy  = CONFIG.ESPINAS.ORIGEN_Y * height;
+  const r   = CONFIG.MOVIMIENTO.RADIO_ORIGEN_TRAZO;
+  const ang = random(TWO_PI);
+  const x   = ox + cos(ang) * random(r);
+  const y   = oy + sin(ang) * random(r);
+  const lib = CONFIG.PALETA.filter(c => c.lock === 0);
+  const col = lib[floor(random(lib.length))];
+  return new Trazo(x, y, col.id);
+}
+
+// ─── PRE-RENDERIZADO DE PINCELES ──────────────────────────────────────────────
+function preRenderizarPinceles() {
+  const alfa     = CONFIG.PINCELES.OPACIDAD_BASE / 255;
+  const resultado = [];
+
+  for (let p = 0; p < pincelesBase.length; p++) {
+    const base = pincelesBase[p];
+    base.loadPixels();
+    const porColor = [];
+
+    for (const color of CONFIG.PALETA) {
+      const img = createImage(base.width, base.height);
+      img.loadPixels();
+      const colaFin = CONFIG.PINCELES.GRADIENTE_COLA; // fracción del ancho donde termina la cola
+
+      for (let i = 0; i < base.pixels.length; i += 4) {
+        const brillo = (base.pixels[i] + base.pixels[i+1] + base.pixels[i+2]) / 3;
+
+        // Gradiente de cola: lado izquierdo (back) → transparente, derecho (front) → opaco
+        const px       = (i / 4) % base.width;
+        const gradCola = px < base.width * colaFin
+          ? px / (base.width * colaFin)  // rampa 0→1
+          : 1.0;
+
+        img.pixels[i]     = color.r;
+        img.pixels[i + 1] = color.g;
+        img.pixels[i + 2] = color.b;
+        img.pixels[i + 3] = (255 - brillo) * alfa * gradCola;
+      }
+      img.updatePixels();
+      porColor.push(img);
+    }
+
+    resultado.push(porColor);
+  }
+  return resultado;
+}
+
+// ─── DEBUG HUD ────────────────────────────────────────────────────────────────
+function _debugHUD() {
+  const den = grid.getDensidad(mouseX, mouseY);
+  const cid = grid.getColorID(mouseX, mouseY);
+  const cn  = cid >= 0 ? CONFIG.PALETA[cid].nombre : '—';
+
+  fill(0, 0, 0, 150);
+  noStroke();
+  rect(8, 8, 270, 54, 4);
+  fill(200, 200, 200);
+  textSize(11);
+  textAlign(LEFT, TOP);
+  text(`Trazos vivos: ${trazos.length}  |  FPS: ${floor(frameRate())}`, 16, 14);
+  text(`Celda: densidad=${den}  colorID=${cid} (${cn})`, 16, 30);
+  text('R → reset  ·  D → toggle debug', 16, 46);
+}
+
+// ─── TECLADO ──────────────────────────────────────────────────────────────────
 function keyPressed() {
-  if (key === ' ') _generarComposicion();
+  if (key === 'd' || key === 'D') CONFIG.DEBUG.ACTIVO = !CONFIG.DEBUG.ACTIVO;
+  if (key === 'r' || key === 'R') {
+    espinaManager.generar();
+    _limpiarLienzo();
+    _poblarTrazos();
+  }
 }

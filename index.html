@@ -2,29 +2,26 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <title>Catarina Voz</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Catarina Voz v2</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      background: rgb(238,232,218);
-      transition: background 0.15s linear;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      min-height: 100vh;
-      overflow: hidden;
-    }
+    body { background: #000; display: flex; justify-content: center; align-items: center; min-height: 100vh; overflow: hidden; }
     canvas { display: block; }
   </style>
 </head>
 <body>
+  <!-- p5.js core -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.3/p5.min.js"></script>
+  <!-- p5.sound -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.3/addons/p5.sound.min.js"></script>
+
+  <!-- Proyecto -->
   <script src="config.js"></script>
-  <script src="SpatialGrid.js"></script>
-  <script src="Nodo.js"></script>
-  <script src="Espina.js"></script>
-  <script src="Red.js"></script>
-  <script src="Trazo.js"></script>
+  <script src="pasticheGrid.js"></script>
+  <script src="espina.js"></script>
+  <script src="trazo.js"></script>
+  <script src="fondo.js"></script>
   <script src="sketch.js"></script>
 </body>
 </html>
