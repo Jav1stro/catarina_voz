@@ -105,24 +105,36 @@ Motor p5.js con sistema de pinceles pre-teñidos, grilla de pastiche y árbol de
 - `celdasOcupadas` es un `Set` compartido entre todos los orígenes para evitar solapamiento.
 - El fondo no registra en `PasticheGrid` — solo los trazos registran densidad.
 - `fondoAmbiente.update()` se llama **antes** del loop de trazos para que los trazos queden siempre encima visualmente.
-- `DELAY_INICIO: 2000` ms — el fondo espera 2 segundos desde el inicio antes de comenzar a expandirse.
+- **Rev. post-Hito 4:** El fondo arranca con `DELAY_INICIO: 0` (inmediatamente). Los trazos esperan `DELAY_TRAZOS: 5000` ms antes de arrancar, dándole al fondo ventaja para cubrir el lienzo. `_dabble()` verifica `grid.getDensidad() > 0` y salta celdas con trazos, evitando que el fondo pinte sobre pintura ya existente. `DENSIDAD_MUERTE: 0` impide además que el fondo expanda hacia cualquier celda tocada por un trazo.
 
-**Criterio cumplido:** Las zonas vacías se cubren gradualmente con color acumulativo; el fondo respeta la pintura de los trazos y espera 2 segundos antes de arrancar.
+**Criterio cumplido:** Las zonas vacías se cubren gradualmente con color acumulativo; el fondo respeta la pintura de los trazos y arranca antes que ellos.
 
 ---
 
-## Hito 4 — Comportamiento de Pastiche (Interacción de Pintura) ← SIGUIENTE
+## Hito 4 — Comportamiento de Pastiche (Interacción de Pintura) ✅ COMPLETADO
 **Objetivo:** Los trazos reaccionan a lo que ya está pintado.
 
-- [ ] **Mezcla/Ensuciado:** alpha↓ al cruzar zona de distinto colorID
-- [ ] **Resistencia:** jitter angular en celdas de alta densidad
-- [ ] **Empaste:** escala↑ del pincel en zonas de alta densidad
+- [x] **Mezcla/Ensuciado:** alpha↓ al estampar sobre zona de distinto colorID
+- [x] **Resistencia:** jitter angular en celdas de alta densidad
+- [x] **Empaste:** escala↑ del pincel en zonas de alta densidad
+- [x] **Borde de pincel:** outline exterior configurable via CSS filter
+- [x] **Activador de pintura:** `_triggerActivo()` — punto único para conectar mouse, teclado o voz
 
-**Criterio de paso:** Zonas pintadas muestran fusión cromática visible; nuevos trazos rodean masas densas en lugar de sobreescribirlas crudamente.
+**Decisiones técnicas tomadas:**
+- Todo el comportamiento vive en `trazo.js` — sin nuevas clases ni archivos.
+- **Mezcla/Ensuciado** se aplica en `_estampar()` (no en `update()`): el alpha decae solo cuando el trazo realmente pinta sobre territorio ajeno, no por mero tránsito. Si `this.alpha < ALPHA_MIN`, el trazo muere sin estampar.
+- **Resistencia** se aplica en `update()` después del blend espina/Perlin: el jitter perturba el ángulo resultante cada frame en celdas densas, haciendo el camino errático antes de que se produzca la estampa.
+- **Empaste** se aplica en `_estampar()`: la `escalaFinal` se suma al `this.escala` base por encima del umbral, sin modificar la propiedad permanente del trazo.
+- La opacidad (`this.alpha`) y el borde se aplican con `drawingContext.save()/restore()` — no con `tint()`, coherente con la prohibición del proyecto.
+- **Borde de pincel:** `CONFIG.PINCELES.BORDE_GROSOR` (px) y `BORDE_COLOR` (RGB). Se implementa con 8 `drop-shadow` CSS en las direcciones cardinal + diagonal via `drawingContext.filter`. El `restore()` limpia el filtro automáticamente. `BORDE_GROSOR: 0` desactiva el borde.
+- **Activador de pintura:** función `_triggerActivo()` en `sketch.js` — retorna `bool`. Único punto a modificar para cambiar el disparador. Opciones documentadas en comentario: `mouseIsPressed`, `keyIsDown(32)` (barra espaciadora, valor actual), `vozActiva` (variable global del audioManager, previsto para Hito 5). El HUD muestra "Pintura: ACTIVA / en pausa" en verde/rojo.
+- Los tres comportamientos de pastiche leen de `grid` (global); ningún valor hardcodeado — todo en `CONFIG.PASTICHE`.
+
+**Criterio cumplido:** Zonas pintadas muestran fusión cromática visible; nuevos trazos rodean masas densas en lugar de sobreescribirlas crudamente; la pintura arranca y se detiene con el activador.
 
 ---
 
-## Hito 5 — Integración de Audio (p5.sound)
+## Hito 5 — Integración de Audio (p5.sound) ← SIGUIENTE
 **Objetivo:** Conectar micrófono/audio al motor de trazos.
 
 **Arquitectura de audio:** `CONFIG` define los límites de diseño (min/max). Un `audioManager` produce un estado vivo (amplitud 0–1, fftFactor 0–1) que el código usa para interpolar dentro de esos límites en tiempo real. `CONFIG` nunca se modifica en runtime.
@@ -136,9 +148,11 @@ Motor p5.js con sistema de pinceles pre-teñidos, grilla de pastiche y árbol de
 **Parámetros que se fijan al nacer el trazo (no cambian durante su vida):**
 - Pincel elegido, color elegido, posición de origen
 
-- [ ] `audioManager` — clase con `amplitud`, `fftFactor`, `coloresLibres()`
+**Hook ya en su lugar (del Hito 4):** `_triggerActivo()` en `sketch.js` retorna `bool` y controla cuándo pintan los trazos. Para conectar la voz: el `audioManager` setea una variable global `vozActiva` y se cambia el return de esa función a `() => vozActiva`.
+
+- [ ] `audioManager` — clase con `amplitud`, `fftFactor`, `coloresLibres()`; setea `vozActiva` según umbral de amplitud
 - [ ] Integración en `trazo.js` — escala y velocidad moduladas por audio cada frame
-- [ ] Integración en `sketch.js` — `_nuevoTrazo()` consulta colores desbloqueados
+- [ ] Integración en `sketch.js` — `_nuevoTrazo()` consulta colores desbloqueados; `_triggerActivo()` conectado a `vozActiva`
 
 **Criterio de paso:** Al hablar/cantar cerca del micrófono, la obra responde en grosor, curvatura y paleta de forma notoria.
 
@@ -157,8 +171,10 @@ Motor p5.js con sistema de pinceles pre-teñidos, grilla de pastiche y árbol de
 
 ## Notas Técnicas Transversales
 - `tint()` está **prohibido en draw()** para colorización. Toda colorización ocurre en `preRenderizarPinceles()` durante setup() via manipulación directa de píxeles.
+- Efectos visuales sobre imágenes en draw() se implementan via `drawingContext.save()/restore()`: `globalAlpha` para opacidad, `filter` con `drop-shadow` para borde. Ambos son restaurados automáticamente por `restore()`.
 - Los pinceles son `pinceles/trazo01–04.png` (fondo blanco, trazo oscuro, sin canal alpha). El brillo invertido se usa como alpha.
 - El proyecto requiere **servidor HTTP local** (Live Server de VS Code) para que `loadPixels()` funcione sin bloqueo CORS.
 - Modo debug activable con tecla `D` · Reset con `R`.
 - Sin valores hardcodeados en el código — todos los parámetros viven en `config.js`.
+- `_triggerActivo()` en `sketch.js` es el **único punto de conexión** entre el disparador externo (mouse/teclado/voz) y el motor de pintura.
 - Orden de carga en `index.html`: `config.js → pasticheGrid.js → espina.js → trazo.js → fondo.js → sketch.js`.

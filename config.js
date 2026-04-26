@@ -42,24 +42,24 @@ const CONFIG = {
   ESPINAS: {
     ORIGEN_X:            0.5,   // fracción del ancho — punto de origen del árbol
     ORIGEN_Y:            0.5,   // fracción del alto
-    CANTIDAD_RAIZ:       20,     // espinas primarias (distribuidas radialmente 360°)
-    PROB_BIFURCACION:    0.35,  // probabilidad de bifurcar en cada segmento hijo
-    VARIACION_ANGULO:    30,    // ± grados de variación aleatoria sobre el ángulo radial
+    CANTIDAD_RAIZ:       10,     // espinas primarias (distribuidas radialmente 360°)
+    PROB_BIFURCACION:    0.65,  // probabilidad de bifurcar en cada segmento hijo
+    VARIACION_ANGULO:    50,    // ± grados de variación aleatoria sobre el ángulo radial
     LONGITUD_MIN:        80,    // px mínimos de una espina
     LONGITUD_MAX:       260,    // px máximos de una espina
     HIJOS_MAX:           3,     // máximo de sub-espinas por espina
     PROFUNDIDAD_MAX:     2,     // niveles de recursión
     BLEND_FUERZA:        0.6,     // 0=solo Perlin · 1=solo espina
     RADIO_INFLUENCIA:    180,   // px — radio de atracción de cada segmento
-    PROB_ARCO:           0.5,   // probabilidad de que una espina sea curva
+    PROB_ARCO:           0.8,   // probabilidad de que una espina sea curva
     RADIO_ARCO_MIN:      120,   // px — radio mínimo del arco
     RADIO_ARCO_MAX:      450,   // px — radio máximo del arco
   },
 
   // ─── MOVIMIENTO / RUIDO ──────────────────────────────────────────────────
   MOVIMIENTO: {
-    TRAZOS_MAX:          12,    // trazos activos simultáneamente
-    RADIO_ORIGEN_TRAZO:  60,    // px — radio de spawn alrededor del origen
+    TRAZOS_MAX:          6,    // trazos activos simultáneamente
+    RADIO_ORIGEN_TRAZO:  260,    // px — radio de spawn alrededor del origen
     VIDA_MIN:            60,    // frames mínimos de vida de un trazo
     VIDA_MAX:            300,   // frames máximos de vida de un trazo
     VELOCIDAD_BASE:   1.8,   // px por frame
@@ -67,6 +67,7 @@ const CONFIG = {
     ESCALA_RUIDO_MAX: 0.020, // escala máxima cuando frecuencia de audio es alta
     PASO_TIEMPO:      0.008, // incremento de tiempo en el ruido por frame
     INTERVALO_STAMP:  6,     // frames entre estampas del pincel
+    DELAY_TRAZOS:     5000,  // ms que espera el motor de trazos para arrancar (da ventaja al fondo)
   },
 
   // ─── AUDIO ───────────────────────────────────────────────────────────────
@@ -83,11 +84,11 @@ const CONFIG = {
   // ─── COMPORTAMIENTO DE PASTICHE ──────────────────────────────────────────
   PASTICHE: {
     // Mezcla / Ensuciado
-    ALPHA_DECAY_MEZCLA:  0.85,  // factor multiplicador de alpha al cruzar color distinto
+    ALPHA_DECAY_MEZCLA:  0.825,  // factor multiplicador de alpha al cruzar color distinto
     ALPHA_MIN:          40,     // alpha mínimo antes de que el trazo "muera"
 
     // Resistencia
-    DENSIDAD_UMBRAL_RESIST: 12,  // densidad a partir de la cual se activa el jitter
+    DENSIDAD_UMBRAL_RESIST: 10,  // densidad a partir de la cual se activa el jitter
     JITTER_MAX:              25, // ± grados de desvío por resistencia
 
     // Empaste
@@ -99,14 +100,14 @@ const CONFIG = {
   FONDO: {
     COLOR:               { r: 60, g: 100, b: 250 }, // color base del fondo
     VARIACION_COLOR:     150,  // ± variación aleatoria de RGB por origen
-    ORIGENES_MAX:        4,    // puntos de origen simultáneos
-    EXPANSION_INTERVALO: 3,    // frames entre cada expansión de una celda
+    ORIGENES_MAX:        2,    // puntos de origen simultáneos
+    EXPANSION_INTERVALO: 2,    // frames entre cada expansión de una celda
     ALPHA_DAB:           4,    // alpha por dab (bajo = acumulación suave tipo acuarela)
-    DABS_POR_FRAME:      10,    // dabs de pintura por frame por origen
+    DABS_POR_FRAME:      10,   // dabs de pintura por frame por origen
     RADIO_DAB:           2.5,  // tamaño del dab en múltiplos del tamaño de celda
-    DENSIDAD_MUERTE:     2,    // densidad de trazo por encima de la cual no se expande
+    DENSIDAD_MUERTE:     10,    // densidad de trazo por encima de la cual no se expande ni pinta
     ESCALA_RUIDO_FLUJO:  0.004, // escala del campo Perlin que dirige la expansión
-    DELAY_INICIO:        2000, // ms a esperar antes de empezar (después del setup)
+    DELAY_INICIO:        0,    // ms a esperar antes de empezar (0 = arrancar inmediatamente)
   },
 
   // ─── PÁGINA ──────────────────────────────────────────────────────────────

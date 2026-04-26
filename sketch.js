@@ -1,11 +1,12 @@
-// sketch.js — Hito 2: Sistema de Trazos Base
+// sketch.js — Hito 3.5 rev: el fondo arranca primero; los trazos esperan DELAY_TRAZOS ms
 
-let pincelesBase    = [];
+let pincelesBase      = [];
 let PINCELES_TINTADOS;
 let grid;
 let espinaManager;
 let fondoAmbiente;
-let trazos          = [];
+let trazos            = [];
+let _trazosIniciados  = false;
 
 // ─── PRELOAD ──────────────────────────────────────────────────────────────────
 function preload() {
@@ -30,7 +31,16 @@ function setup() {
   document.querySelector('canvas').style.boxShadow = CONFIG.PAGINA.CANVAS_SHADOW;
 
   _limpiarLienzo();
-  _poblarTrazos();
+  // Los trazos no arrancan en setup() — esperan DELAY_TRAZOS ms para dar ventaja al fondo
+}
+
+// ─── ACTIVADOR DE PINTURA ─────────────────────────────────────────────────────
+// Única función a cambiar para conectar otro disparador:
+//   Mouse:        () => mouseIsPressed
+//   Teclado:      () => keyIsDown(32)   // barra espaciadora
+//   Voz (futuro): () => vozActiva       // variable global del audioManager
+function _triggerActivo() {
+  return keyIsDown(32);
 }
 
 // ─── DRAW ─────────────────────────────────────────────────────────────────────
@@ -38,11 +48,20 @@ function draw() {
   // Sin background() por frame: la pintura se acumula
   fondoAmbiente.update();
 
-  for (let i = trazos.length - 1; i >= 0; i--) {
-    trazos[i].update();
-    if (trazos[i].muerto) {
-      trazos.splice(i, 1);
-      trazos.push(_nuevoTrazo()); // reemplaza inmediatamente
+  // El fondo tiene DELAY_TRAZOS ms de ventaja antes de que arranquen los trazos
+  if (!_trazosIniciados && millis() >= CONFIG.MOVIMIENTO.DELAY_TRAZOS) {
+    _trazosIniciados = true;
+    _poblarTrazos();
+  }
+
+  // Los trazos solo pintan cuando el activador está activo
+  if (_trazosIniciados && _triggerActivo()) {
+    for (let i = trazos.length - 1; i >= 0; i--) {
+      trazos[i].update();
+      if (trazos[i].muerto) {
+        trazos.splice(i, 1);
+        trazos.push(_nuevoTrazo()); // reemplaza inmediatamente
+      }
     }
   }
 
@@ -125,15 +144,20 @@ function _debugHUD() {
   const cid = grid.getColorID(mouseX, mouseY);
   const cn  = cid >= 0 ? CONFIG.PALETA[cid].nombre : '—';
 
+  const triggerOn = _trazosIniciados && _triggerActivo();
+
   fill(0, 0, 0, 150);
   noStroke();
-  rect(8, 8, 270, 54, 4);
+  rect(8, 8, 270, 68, 4);
   fill(200, 200, 200);
   textSize(11);
   textAlign(LEFT, TOP);
   text(`Trazos vivos: ${trazos.length}  |  FPS: ${floor(frameRate())}`, 16, 14);
   text(`Celda: densidad=${den}  colorID=${cid} (${cn})`, 16, 30);
-  text('R → reset  ·  D → toggle debug', 16, 46);
+  fill(triggerOn ? [80, 220, 120] : [220, 100, 80]);
+  text(`Pintura: ${triggerOn ? 'ACTIVA' : 'en pausa'}`, 16, 46);
+  fill(200, 200, 200);
+  text('R → reset  ·  D → toggle debug', 16, 60);
 }
 
 // ─── TECLADO ──────────────────────────────────────────────────────────────────
@@ -142,6 +166,7 @@ function keyPressed() {
   if (key === 'r' || key === 'R') {
     espinaManager.generar();
     _limpiarLienzo();
-    _poblarTrazos();
+    trazos            = [];
+    _trazosIniciados  = false; // el fondo vuelve a tener ventaja desde el reset
   }
 }

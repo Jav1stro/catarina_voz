@@ -72,7 +72,7 @@ class FondoOrigen {
     }
   }
 
-  // Deposita dabs suaves sobre el área reclamada
+  // Deposita dabs suaves sobre el área reclamada que no haya sido pintada por trazos
   _dabble() {
     if (this.celdasList.length === 0) return;
     const n    = min(CONFIG.FONDO.DABS_POR_FRAME, this.celdasList.length);
@@ -87,6 +87,9 @@ class FondoOrigen {
       const r   = floor(idx / this.cols);
       const cx  = c * this.tam + this.tam * 0.5;
       const cy  = r * this.tam + this.tam * 0.5;
+
+      // No pintar sobre celdas que ya tienen trazos encima
+      if (grid.getDensidad(cx, cy) > 0) continue;
 
       // Elipse con leve jitter de posición, tamaño y proporción
       const ox  = random(-this.tam * 0.4, this.tam * 0.4);
