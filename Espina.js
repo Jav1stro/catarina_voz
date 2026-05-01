@@ -1,245 +1,198 @@
-// Espina.js — Árbol orgánico: tronco + ramas + sub-ramas.
-// Cada Rama es una curva Catmull-Rom que crece progresivamente.
-// Los nodos de Red nacen a lo largo de todas las ramas del árbol.
+// espina.js — Hito 3 (arcos + rectas)
 
-class Rama {
-  constructor(posInicio, anguloInicial, largo, grosorBase, nivel) {
-    this.largo      = largo;
-    this.grosorBase = grosorBase;
-    this.nivel      = nivel;     // 0 = tronco, 1 = rama, 2 = sub-rama
-    this.nOffset    = random(1000);
-    this.nOffsetG   = random(1000);
-    this.pts        = [];
-    this.progreso   = 0;
-    this.retraso    = 0;
-    this.duracion   = max(18, floor(largo * CFG.ARBOL.DURACION_FACTOR));
-    this.muestras   = max(60, floor(largo * 0.30));
-    this._generarCurva(posInicio, anguloInicial);
-  }
+// ─── ESPINA ───────────────────────────────────────────────────────────────────
+class Espina {
+  constructor(x, y, angulo, longitud, profundidad) {
+    this.x           = x;
+    this.y           = y;
+    this.angulo      = angulo;
+    this.longitud    = longitud;
+    this.profundidad = profundidad;
+    this.hijos       = [];
 
-  _generarCurva(posInicio, anguloInicial) {
-    let numCtrl = floor(random(4, 8));
-    let x   = posInicio.x;
-    let y   = posInicio.y;
-    let ang = anguloInicial;
+    // Decidir si es recta o arco
+    if (random() < CONFIG.ESPINAS.PROB_ARCO) {
+      const r = random(CONFIG.ESPINAS.RADIO_ARCO_MIN, CONFIG.ESPINAS.RADIO_ARCO_MAX);
+      this.curvatura = random() < 0.5 ? r : -r; // positivo=izquierda · negativo=derecha
+    } else {
+      this.curvatura = 0;
+    }
 
-    this.pts.push(createVector(x, y));
+    // Calcular puntos a lo largo del camino (recta o arco)
+    this._puntos = this._computarPuntos(20);
 
-    for (let i = 1; i <= numCtrl; i++) {
-      let paso = this.largo / numCtrl;
-      let nVal = noise(i * 0.55 + this.nOffset);
-      let curv = (this.nivel === 0) ? PI * 0.18 : PI * 0.28;
-      ang += map(nVal, 0, 1, -curv, curv);
+    const ultimo   = this._puntos[this._puntos.length - 1];
+    this.xFin      = ultimo.x;
+    this.yFin      = ultimo.y;
+    this.anguloFin = ultimo.a;
 
-      x += cos(ang) * paso * random(0.8, 1.2);
-      y += sin(ang) * paso * random(0.8, 1.2);
-
-      x = constrain(x, ANCHO * 0.04, ANCHO * 0.96);
-      y = constrain(y, ALTO  * 0.02, ALTO  * 0.98);
-
-      this.pts.push(createVector(x, y));
+    if (profundidad < CONFIG.ESPINAS.PROFUNDIDAD_MAX) {
+      this._bifurcar();
     }
   }
 
-  // Catmull-Rom en t ∈ [0,1]
-  evaluar(t) {
-    let n      = this.pts.length - 1;
-    let seg    = constrain(floor(t * n), 0, n - 1);
-    let localT = t * n - seg;
+  // Devuelve array de {x, y, a} con N+1 puntos a lo largo del camino
+  _computarPuntos(N) {
+    const pts = [];
 
-    let i0 = max(0, seg - 1);
-    let i1 = seg;
-    let i2 = min(n, seg + 1);
-    let i3 = min(n, seg + 2);
+    if (this.curvatura === 0) {
+      // Segmento recto
+      for (let i = 0; i <= N; i++) {
+        const t = i / N;
+        pts.push({
+          x: this.x + cos(this.angulo) * this.longitud * t,
+          y: this.y + sin(this.angulo) * this.longitud * t,
+          a: this.angulo,
+        });
+      }
+    } else {
+      // Arco
+      // sign > 0 → curva a la izquierda (centro a la izquierda de la dirección de avance)
+      const sign        = this.curvatura > 0 ? 1 : -1;
+      const absR        = abs(this.curvatura);
+      // Centro de curvatura: perpendicular al ángulo de avance
+      const perpAngulo  = this.angulo - sign * HALF_PI;
+      const cx          = this.x + cos(perpAngulo) * absR;
+      const cy          = this.y + sin(perpAngulo) * absR;
+      const startAngle  = atan2(this.y - cy, this.x - cx);
+      const arcSweep    = this.longitud / absR; // radianes totales del arco
 
-    return createVector(
-      curvePoint(this.pts[i0].x, this.pts[i1].x, this.pts[i2].x, this.pts[i3].x, localT),
-      curvePoint(this.pts[i0].y, this.pts[i1].y, this.pts[i2].y, this.pts[i3].y, localT)
-    );
-  }
-
-  // Tangente normalizada en t — usada para orientar ramas hijas
-  tangente(t) {
-    let n      = this.pts.length - 1;
-    let seg    = constrain(floor(t * n), 0, n - 1);
-    let localT = t * n - seg;
-
-    let i0 = max(0, seg - 1);
-    let i1 = seg;
-    let i2 = min(n, seg + 1);
-    let i3 = min(n, seg + 2);
-
-    let tx = curveTangent(this.pts[i0].x, this.pts[i1].x, this.pts[i2].x, this.pts[i3].x, localT);
-    let ty = curveTangent(this.pts[i0].y, this.pts[i1].y, this.pts[i2].y, this.pts[i3].y, localT);
-    let len = sqrt(tx * tx + ty * ty);
-    if (len < 0.001) return createVector(0, -1);
-    return createVector(tx / len, ty / len);
-  }
-
-  // Frame en que la punta de la rama llega a t — para sincronizar ramas hijas y nodos
-  frameEnT(t) {
-    return this.retraso + floor(t * this.duracion);
-  }
-
-  actualizar(frame) {
-    if (frame < this.retraso) return;
-    this.progreso = min((frame - this.retraso) / this.duracion, 1);
-  }
-
-  dibujar() {
-    if (this.progreso <= 0) return;
-
-    let col   = this._colorPorNivel();
-    let limit = floor(this.progreso * this.muestras);
-    let prev  = null;
-
-    for (let i = 0; i <= limit; i++) {
-      let t  = i / this.muestras;
-      let pt = this.evaluar(t);
-
-      let envolv = sin(t * PI * 0.5 + PI * 0.5); // 1 en la base, 0 en la punta
-      let nGros  = noise(t * 4.5 + this.nOffsetG);
-      let g      = max(0.3, this.grosorBase * envolv * (0.5 + 0.5 * nGros));
-
-      strokeWeight(g);
-      stroke(red(col), green(col), blue(col), 175);
-      noFill();
-      if (prev) line(prev.x, prev.y, pt.x, pt.y);
-      prev = pt;
+      for (let i = 0; i <= N; i++) {
+        const t = i / N;
+        const a = startAngle - sign * arcSweep * t;
+        pts.push({
+          x: cx + cos(a) * absR,
+          y: cy + sin(a) * absR,
+          a: a - sign * HALF_PI,   // tangente en ese punto
+        });
+      }
     }
 
-    if (this.progreso < 1) {
-      let punta = this.evaluar(this.progreso);
-      noStroke();
-      fill(255, 255, 210, 185);
-      ellipse(punta.x, punta.y, 4, 4);
+    return pts;
+  }
+
+  _bifurcar() {
+    for (let i = 0; i < CONFIG.ESPINAS.HIJOS_MAX; i++) {
+      if (random() > CONFIG.ESPINAS.PROB_BIFURCACION) continue;
+
+      // Punto de nacimiento sobre el camino de esta espina
+      const t   = random(0.25, 0.85);
+      const idx = floor(t * (this._puntos.length - 1));
+      const pt  = this._puntos[idx];
+
+      // El hijo hereda la tangente local + desviación
+      const devMax   = radians(CONFIG.ESPINAS.VARIACION_ANGULO) * (1 + this.profundidad * 0.3);
+      const anguloH  = pt.a + random(-devMax, devMax);
+      const longH    = random(CONFIG.ESPINAS.LONGITUD_MIN, CONFIG.ESPINAS.LONGITUD_MAX) *
+                       map(this.profundidad, 0, CONFIG.ESPINAS.PROFUNDIDAD_MAX, 1.0, 0.5);
+
+      this.hijos.push(new Espina(pt.x, pt.y, anguloH, longH, this.profundidad + 1));
     }
   }
 
-  _colorPorNivel() {
-    if (this.nivel === 0) return PALETA[0]; // teal oscuro
-    if (this.nivel === 1) return PALETA[1]; // verde claro
-    return PALETA[2];                        // naranja
+  // Agrega segmentos consecutivos del camino a `lista` (para el campo de fuerza)
+  recolectarSegmentos(lista) {
+    for (let i = 0; i < this._puntos.length - 1; i++) {
+      const p1 = this._puntos[i];
+      const p2 = this._puntos[i + 1];
+      lista.push({
+        x1: p1.x, y1: p1.y,
+        x2: p2.x, y2: p2.y,
+        angulo: p1.a,
+        profundidad: this.profundidad,
+      });
+    }
+    for (const h of this.hijos) h.recolectarSegmentos(lista);
   }
 
-  terminado() { return this.progreso >= 1; }
+  debug() {
+    const t   = map(this.profundidad, 0, CONFIG.ESPINAS.PROFUNDIDAD_MAX, 1, 0);
+    const alf = map(t, 0, 1, 40, 180);
+    const sw  = map(t, 0, 1, 0.6, 2.2);
+
+    const col = this.profundidad === 0
+      ? CONFIG.DEBUG.ESPINA_COLOR_RAIZ
+      : CONFIG.DEBUG.ESPINA_COLOR_RAMA;
+    stroke(col[0], col[1], col[2], alf);
+    strokeWeight(sw);
+    noFill();
+
+    beginShape();
+    for (const p of this._puntos) vertex(p.x, p.y);
+    endShape();
+
+    // Flecha en el extremo final
+    const fin = this._puntos[this._puntos.length - 1];
+    push();
+    translate(fin.x, fin.y);
+    rotate(fin.a);
+    stroke(col[0], col[1], col[2], alf * 0.6);
+    const sz = map(t, 0, 1, 3, 7);
+    line(0, 0, -sz, -sz * 0.5);
+    line(0, 0, -sz,  sz * 0.5);
+    pop();
+
+    for (const h of this.hijos) h.debug();
+  }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-
-class Espina {
+// ─── ESPINA MANAGER ───────────────────────────────────────────────────────────
+class EspinaManager {
   constructor() {
-    this.ramas    = [];
-    this.retraso  = 0;
-    this.duracion = 0; // frame en que termina la última rama
-    this._generarArbol();
+    this.raices    = [];
+    this.segmentos = [];
+    this.generar();
   }
 
-  _generarArbol() {
-    let TR = CFG.TRONCO;
-    let RA = CFG.RAMAS;
-    let SR = CFG.SUB_RAMAS;
+  generar() {
+    this.raices    = [];
+    this.segmentos = [];
 
-    // ── Tronco (nivel 0) ────────────────────────────────────────
-    let troncoLargo  = random(ALTO * TR.LARGO_MIN, ALTO * TR.LARGO_MAX);
-    let troncoGrosor = random(TR.GROSOR_MIN, TR.GROSOR_MAX);
-    let troncoIni    = createVector(
-      ANCHO * 0.5 + random(-ANCHO * TR.OFFSET_X, ANCHO * TR.OFFSET_X),
-      ALTO  * 0.96
-    );
-    let troncoAng = -HALF_PI + random(-TR.ANG_JITTER, TR.ANG_JITTER);
+    const n   = CONFIG.ESPINAS.CANTIDAD_RAIZ;
+    const ox  = CONFIG.ESPINAS.ORIGEN_X * width;
+    const oy  = CONFIG.ESPINAS.ORIGEN_Y * height;
+    const dev = radians(CONFIG.ESPINAS.VARIACION_ANGULO);
 
-    let tronco = new Rama(troncoIni, troncoAng, troncoLargo, troncoGrosor, 0);
-    tronco.retraso = 0;
-    this.ramas.push(tronco);
+    for (let i = 0; i < n; i++) {
+      // Ángulos distribuidos uniformemente en 360°, con variación aleatoria
+      const anguloBase = (i / n) * TWO_PI + random(-dev, dev);
+      const longitud   = random(CONFIG.ESPINAS.LONGITUD_MAX, CONFIG.ESPINAS.LONGITUD_MAX * 2.2);
 
-    // ── Ramas nivel 1 ───────────────────────────────────────────
-    let numRamas  = floor(random(RA.NUM_MIN, RA.NUM_MAX));
-    let tPosRamas = [];
-    for (let i = 0; i < numRamas; i++) {
-      tPosRamas.push(random(RA.T_MIN, RA.T_MAX));
+      const e = new Espina(ox, oy, anguloBase, longitud, 0);
+      this.raices.push(e);
+      e.recolectarSegmentos(this.segmentos);
     }
-    tPosRamas.sort((a, b) => a - b);
-
-    let lado = random() < 0.5 ? 1 : -1;
-
-    for (let i = 0; i < numRamas; i++) {
-      let tBifurc = tPosRamas[i];
-      let posBif  = tronco.evaluar(tBifurc);
-      let tanDir  = tronco.tangente(tBifurc);
-      let angBase = atan2(tanDir.y, tanDir.x);
-
-      let div     = lerp(RA.DIV_MIN, RA.DIV_MAX, tBifurc) * lado;
-      let ramaAng = angBase + div;
-
-      let ramaLargo  = troncoLargo * random(RA.LARGO_MIN, RA.LARGO_MAX) * (1 - tBifurc * 0.45);
-      let ramaGrosor = troncoGrosor * random(RA.GROSOR_MIN, RA.GROSOR_MAX);
-
-      let rama = new Rama(posBif, ramaAng, ramaLargo, ramaGrosor, 1);
-      rama.retraso = tronco.frameEnT(tBifurc) + floor(random(RA.RETRASO_MIN, RA.RETRASO_MAX));
-      this.ramas.push(rama);
-
-      // ── Sub-ramas (nivel 2) ────────────────────────────────────
-      if (random() < SR.PROB) {
-        let numSub = floor(random(SR.NUM_MIN, SR.NUM_MAX));
-        for (let s = 0; s < numSub; s++) {
-          let tSub   = random(SR.T_MIN, SR.T_MAX);
-          let posSub = rama.evaluar(tSub);
-          let tanSub = rama.tangente(tSub);
-          let angSub = atan2(tanSub.y, tanSub.x);
-
-          let divSub    = random(SR.DIV_MIN, SR.DIV_MAX) * (random() < 0.5 ? 1 : -1);
-          let subAng    = angSub + divSub;
-          let subLargo  = ramaLargo * random(SR.LARGO_MIN, SR.LARGO_MAX);
-          let subGrosor = ramaGrosor * random(SR.GROSOR_MIN, SR.GROSOR_MAX);
-
-          let subRama = new Rama(posSub, subAng, subLargo, subGrosor, 2);
-          subRama.retraso = rama.frameEnT(tSub) + floor(random(SR.RETRASO_MIN, SR.RETRASO_MAX));
-          this.ramas.push(subRama);
-        }
-      }
-
-      lado *= -1;
-    }
-
-    this.duracion = max(...this.ramas.map(r => r.retraso + r.duracion));
   }
 
-  // Retorna n posiciones exactas sobre las ramas como { pos, rama, t }
-  obtenerPosicionesNodos(n) {
-    let posiciones = [];
+  // Media circular ponderada por distancia inversa
+  getFuerza(x, y) {
+    const radio = CONFIG.ESPINAS.RADIO_INFLUENCIA;
+    let sumPeso = 0, sumSin = 0, sumCos = 0;
 
-    const W        = CFG.ARBOL.PESO_NIVEL;
-    let largoTotal = this.ramas.reduce((acc, r) => acc + r.largo * W[r.nivel], 0);
-    let asignados  = this.ramas.map(r => max(1, floor(n * r.largo * W[r.nivel] / largoTotal)));
+    for (const seg of this.segmentos) {
+      const dx   = seg.x2 - seg.x1;
+      const dy   = seg.y2 - seg.y1;
+      const len2 = dx * dx + dy * dy;
+      const t    = len2 > 0
+        ? constrain(((x - seg.x1) * dx + (y - seg.y1) * dy) / len2, 0, 1)
+        : 0;
+      const d = dist(x, y, seg.x1 + t * dx, seg.y1 + t * dy);
 
-    let diff = n - asignados.reduce((a, b) => a + b, 0);
-    for (let i = 0; i < abs(diff); i++) {
-      asignados[i % this.ramas.length] = max(1, asignados[i % this.ramas.length] + (diff > 0 ? 1 : -1));
-    }
-
-    for (let ri = 0; ri < this.ramas.length; ri++) {
-      let rama = this.ramas[ri];
-      let num  = asignados[ri];
-
-      for (let i = 0; i < num; i++) {
-        let t = constrain((i + 0.5) / num + random(-0.05, 0.05), 0.04, 0.96);
-        posiciones.push({ pos: rama.evaluar(t).copy(), rama, t });
+      if (d < radio) {
+        const peso = 1.0 / (d + 1);
+        sumPeso += peso;
+        sumSin  += sin(seg.angulo) * peso;
+        sumCos  += cos(seg.angulo) * peso;
       }
     }
 
-    return posiciones;
+    if (sumPeso === 0) return radians(CONFIG.ESPINAS.ANGULO_BASE);
+    return atan2(sumSin / sumPeso, sumCos / sumPeso);
   }
 
-  actualizar(frame) {
-    for (let r of this.ramas) r.actualizar(frame);
-  }
-
-  dibujar() {
-    for (let r of this.ramas) r.dibujar();
-  }
-
-  terminado() {
-    return this.ramas.every(r => r.terminado());
+  debug() {
+    noFill();
+    for (const r of this.raices) r.debug();
+    noStroke();
   }
 }
