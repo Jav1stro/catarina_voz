@@ -40,7 +40,7 @@ function setup() {
 //   Teclado:      () => keyIsDown(32)   // barra espaciadora
 //   Voz (futuro): () => vozActiva       // variable global del audioManager
 function _triggerActivo() {
-  return keyIsDown(32);
+  return mouseIsPressed;
 }
 
 // ─── DRAW ─────────────────────────────────────────────────────────────────────
@@ -144,20 +144,15 @@ function _debugHUD() {
   const cid = grid.getColorID(mouseX, mouseY);
   const cn  = cid >= 0 ? CONFIG.PALETA[cid].nombre : '—';
 
-  const triggerOn = _trazosIniciados && _triggerActivo();
-
   fill(0, 0, 0, 150);
   noStroke();
-  rect(8, 8, 270, 68, 4);
+  rect(8, 8, 270, 54, 4);
   fill(200, 200, 200);
   textSize(11);
   textAlign(LEFT, TOP);
   text(`Trazos vivos: ${trazos.length}  |  FPS: ${floor(frameRate())}`, 16, 14);
   text(`Celda: densidad=${den}  colorID=${cid} (${cn})`, 16, 30);
-  fill(triggerOn ? [80, 220, 120] : [220, 100, 80]);
-  text(`Pintura: ${triggerOn ? 'ACTIVA' : 'en pausa'}`, 16, 46);
-  fill(200, 200, 200);
-  text('R → reset  ·  D → toggle debug', 16, 60);
+  text('R → reset  ·  D → toggle debug', 16, 46);
 }
 
 // ─── TECLADO ──────────────────────────────────────────────────────────────────

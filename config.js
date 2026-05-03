@@ -30,6 +30,8 @@ const CONFIG = {
     ],
     OPACIDAD_BASE:   50,   // 0–255, alpha global de la textura al pre-teñir
     GRADIENTE_COLA:  0.8,  // fracción del ancho con fade de cola (0=sin fade · 1=todo el ancho)
+    BORDE_GROSOR:    2,    // px de borde exterior (0 = sin borde)
+    BORDE_COLOR:     [20, 38, 32], // RGB del borde
   },
 
   // ─── GRILLA DE PASTICHE ──────────────────────────────────────────────────
